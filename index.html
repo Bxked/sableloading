@@ -491,19 +491,68 @@
         // LOGIC (no need to edit below)
         // ============================================
         
-        // Parse URL parameters from GMod
-        const params = new URLSearchParams(window.location.search);
+        // ============================================
+        // GMOD LOADING SCREEN API
+        // ============================================
+        // Modern GMod (x86-64 branch) does NOT pass URL parameters.
+        // Instead it calls these JavaScript functions directly:
+        //   GameDetails(servername, serverurl, mapname, maxplayers, steamid, gamemode)
+        //   SetFilesTotal(total)
+        //   SetFilesNeeded(needed)
+        //   DownloadingFile(filename)
+        //   SetStatusChanged(status)
         
         const mapEl = document.getElementById('mapName');
         const maxEl = document.getElementById('maxPlayers');
         const steamEl = document.getElementById('steamId');
         
-        if (params.get('mapname')) mapEl.textContent = params.get('mapname');
-        if (params.get('maxplayers')) maxEl.textContent = params.get('maxplayers');
-        if (params.get('steamid')) {
-            const sid = params.get('steamid');
-            steamEl.textContent = sid.length > 20 ? sid.substring(0, 18) + '...' : sid;
+        // Called by GMod with server info when loading begins
+        function GameDetails(servername, serverurl, mapname, maxplayers, steamid, gamemode) {
+            if (mapname) mapEl.textContent = mapname;
+            if (maxplayers) maxEl.textContent = maxplayers;
+            if (steamid) {
+                steamEl.textContent = steamid.length > 20 ? steamid.substring(0, 18) + '...' : steamid;
+            }
         }
+        
+        // Called by GMod with total files to download
+        let totalFiles = 0;
+        let filesLoaded = 0;
+        
+        function SetFilesTotal(total) {
+            totalFiles = total;
+        }
+        
+        // Called by GMod as files are downloaded
+        function SetFilesNeeded(needed) {
+            filesLoaded = totalFiles - needed;
+            // Update loading status
+            const statusEl = document.querySelector('.loading-status');
+            if (statusEl && totalFiles > 0) {
+                const pct = Math.floor((filesLoaded / totalFiles) * 100);
+                statusEl.innerHTML = "Downloading files (" + pct + "%)<span class=\"dot\">.</span><span class=\"dot\">.</span><span class=\"dot\">.</span>";
+            }
+        }
+        
+        // Called by GMod with the current file being downloaded
+        function DownloadingFile(filename) {
+            // You could display the filename if you want
+            // console.log("Downloading: " + filename);
+        }
+        
+        // Called by GMod when loading status changes
+        function SetStatusChanged(status) {
+            const statusEl = document.querySelector('.loading-status');
+            if (statusEl && status) {
+                statusEl.innerHTML = status + "<span class=\"dot\">.</span><span class=\"dot\">.</span><span class=\"dot\">.</span>";
+            }
+        }
+        
+        // Fallback: also try URL parameters (older GMod versions)
+        const params = new URLSearchParams(window.location.search);
+        if (params.get("mapname")) mapEl.textContent = params.get("mapname");
+        if (params.get("maxplayers")) maxEl.textContent = params.get("maxplayers");
+        if (params.get("steamid")) steamEl.textContent = params.get("steamid");
         
         // Timer
         const startTime = Date.now();
